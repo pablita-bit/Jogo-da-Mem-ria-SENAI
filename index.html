@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full select-none overflow-hidden">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo da Memória Frutas — Mundo SENAI</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            senai: {
+              primary: '#00529C',   /* Azul SENAI */
+              secondary: '#003A70',
+              accent: '#00A3E0',     /* Azul Cyan Clean */
+              red: '#E30613'        /* Vermelho SENAI */
+            }
+          },
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    .transform-style-3d {
+      transform-style: preserve-3d;
+    }
+    .backface-hidden {
+      backface-visibility: hidden;
+    }
+    .rotate-y-180 {
+      transform: rotateY(180deg);
+    }
+    .card-inner {
+      transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    @keyframes matchPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+      100% { transform: scale(1); }
+    }
+    .card-matched {
+      animation: matchPulse 0.35s ease-in-out forwards;
+    }
+    ::-webkit-scrollbar {
+      width: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen w-screen flex flex-col justify-between overflow-hidden selection:bg-senai-accent selection:text-white">
+
+  <header class="h-14 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shrink-0 px-4 flex items-center justify-between z-30 shadow-sm">
+    <div class="flex items-center gap-3">
+      <div class="bg-senai-primary px-3 py-1 rounded-xl text-white font-extrabold text-xs tracking-wider flex items-center gap-1.5 shadow-sm">
+        <i data-lucide="apple" class="w-4 h-4 text-emerald-300"></i>
+        <span>SENAI</span>
+      </div>
+      <div>
+        <span class="text-[9px] uppercase tracking-widest text-slate-400 font-bold block leading-none">Mundo SENAI</span>
+        <h1 class="text-xs sm:text-sm font-bold text-slate-800 leading-tight">Memória Tech: Frutas & Informática</h1>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- Mudar Jogador -->
+      <button onclick="openPlayerModal()" class="bg-slate-100 hover:bg-slate-200/70 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition" title="Trocar Jogador">
+        <i data-lucide="user" class="w-3.5 h-3.5 text-senai-primary"></i>
+        <span id="headerPlayerName" class="max-w-[90px] sm:max-w-[130px] truncate">Convidado</span>
+      </button>
+
+      <!-- Botão Ranking -->
+      <button onclick="openRankingModal()" class="bg-amber-50 hover:bg-amber-100/80 text-amber-700 border border-amber-200/80 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition">
+        <i data-lucide="trophy" class="w-3.5 h-3.5 text-amber-500"></i>
+        <span class="hidden sm:inline">Ranking</span>
+      </button>
+
+      <!-- Toggle Audio -->
+      <button id="soundToggleBtn" onclick="toggleAudio()" class="bg-slate-100 hover:bg-slate-200/70 text-slate-700 border border-slate-200 p-2 rounded-xl transition" title="Ativar/Desativar Som">
+        <i data-lucide="volume-2" id="soundIcon" class="w-3.5 h-3.5 text-senai-primary"></i>
+      </button>
+
+      <!-- Ver Código -->
+      <button onclick="toggleCodeDrawer()" class="bg-slate-100 hover:bg-slate-200/70 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+        <i data-lucide="code-2" class="w-3.5 h-3.5 text-senai-primary"></i>
+        <span class="hidden md:inline">Ver Código</span>
+      </button>
+
+      <!-- Roteiro Apresentador -->
+      <button onclick="toggleModalApresentador()" class="bg-senai-primary hover:bg-senai-secondary text-white font-semibold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm">
+        <i data-lucide="mic" class="w-3.5 h-3.5"></i>
+        <span class="hidden md:inline">Apresentador</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-grow w-full max-w-6xl mx-auto px-4 py-2 flex flex-col items-center justify-between gap-2 overflow-hidden min-h-0">
+
+    <!-- BARRA DE STATUS DA PARTIDA -->
+    <div class="w-full bg-white border border-slate-200/80 px-4 py-2 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-2 shrink-0 text-xs">
+      
+      <!-- Seletor de Dificuldade -->
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-slate-400 font-semibold text-[11px]">Dificuldade:</span>
+        <div class="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200/60">
+          <button onclick="setDifficulty('easy')" id="btnDiffEasy" class="px-3 py-1 rounded-lg text-[11px] font-bold transition bg-senai-primary text-white shadow-sm">
+            Fácil (4)
+          </button>
+          <button onclick="setDifficulty('medium')" id="btnDiffMedium" class="px-3 py-1 rounded-lg text-[11px] font-bold transition text-slate-500 hover:text-slate-800">
+            Médio (6)
+          </button>
+          <button onclick="setDifficulty('hard')" id="btnDiffHard" class="px-3 py-1 rounded-lg text-[11px] font-bold transition text-slate-500 hover:text-slate-800">
+            Difícil (8)
+          </button>
+        </div>
+      </div>
+
+      <!-- Placar e Cronômetro -->
+      <div class="flex items-center gap-5 font-mono text-xs">
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="footprints" class="w-3.5 h-3.5 text-senai-accent"></i>
+          <span class="text-slate-400">Jogadas:</span>
+          <strong id="movesCount" class="text-slate-800">0</strong>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="timer" class="w-3.5 h-3.5 text-emerald-500"></i>
+          <span class="text-slate-400">Tempo:</span>
+          <strong id="timerDisplay" class="text-emerald-600 font-bold">00:00</strong>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="check-circle2" class="w-3.5 h-3.5 text-amber-500"></i>
+          <span class="text-slate-400">Pares:</span>
+          <strong id="pairsDisplay" class="text-amber-600 font-bold">0/4</strong>
+        </div>
+      </div>
+
+      <!-- Botão Reiniciar -->
+      <button onclick="startNewGame()" class="bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition">
+        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-senai-primary"></i>
+        <span>Reiniciar</span>
+      </button>
+    </div>
+
+    <!-- BANNER DE MEMORIZAÇÃO REGRESSIVA -->
+    <div id="previewBanner" class="w-full bg-amber-500/10 border border-amber-300/60 px-4 py-2 rounded-2xl flex items-center justify-between gap-2 text-amber-800 shrink-0 shadow-sm">
+      <div class="flex items-center gap-2">
+        <i data-lucide="eye" class="w-4 h-4 text-amber-600 animate-pulse"></i>
+        <span class="text-xs font-semibold">Memorize a localização das frutas!</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="w-32 bg-amber-200/60 rounded-full h-2 overflow-hidden border border-amber-300/80">
+          <div id="previewProgressBar" class="bg-amber-500 h-full w-full transition-all duration-1000 ease-linear rounded-full"></div>
+        </div>
+        <span id="previewCountdown" class="font-mono font-extrabold text-xs text-amber-700 min-w-[24px] text-center">3s</span>
+      </div>
+    </div>
+
+    <!-- FEEDBACK DE ACERTO -->
+    <div id="matchFeedbackBanner" class="w-full bg-emerald-500/10 border border-emerald-300/70 px-4 py-1.5 rounded-2xl hidden flex items-center gap-3 text-emerald-900 transition-all duration-300 shrink-0 shadow-sm">
+      <div id="matchFeedbackEmoji" class="text-3xl bg-white p-1 rounded-xl shadow-sm border border-emerald-200 leading-none">
+        🍎
+      </div>
+      <div class="overflow-hidden">
+        <h4 id="matchFeedbackTitle" class="font-bold text-xs text-emerald-800 truncate">Maçã - Estrutura de Dados</h4>
+        <p id="matchFeedbackConcept" class="text-[11px] text-emerald-700 leading-tight truncate">
+          Estrutura simples, limpa e essencial como uma maçã fresca.
+        </p>
+      </div>
+    </div>
+
+    <div class="w-full flex-grow flex items-center justify-center overflow-hidden min-h-0 py-1">
+      <div id="cardsGrid" class="w-full h-full grid gap-3 items-center justify-center max-h-full">
+        <!-- Cartas geradas via JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="h-6 bg-white border-t border-slate-200 px-4 text-[10px] text-slate-400 flex items-center justify-between shrink-0 font-mono">
+    <span>Estande Técnico em Informática para Internet — SENAI 2026</span>
+    <span class="hidden sm:inline">Jogo da Memória Clean & Responsivo</span>
+  </footer>
+
+  <div id="modalPlayer" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 text-center shadow-2xl relative">
+      
+      <div class="w-16 h-16 bg-senai-primary/10 border border-senai-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-3 text-senai-primary shadow-inner">
+        <i data-lucide="apple" class="w-9 h-9 text-senai-primary"></i>
+      </div>
+
+      <span class="text-[10px] font-mono font-extrabold text-senai-primary uppercase tracking-widest">Mundo SENAI 2026</span>
+      <h2 class="text-xl font-extrabold text-slate-800 mt-0.5">Memória Tech Frutas</h2>
+      <p class="text-xs text-slate-500 mt-1 mb-5">Informe seu nome para disputar um lugar no Ranking do Estande!</p>
+
+      <form onsubmit="handleStartGameFromModal(event)" class="space-y-4">
+        <div class="text-left">
+          <label class="block text-[11px] font-mono font-semibold text-slate-500 mb-1">Seu Nome / Apelido:</label>
+          <input type="text" id="inputPlayerName" required maxlength="18" placeholder="Ex: Lucas Silva" 
+                 class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-senai-primary focus:ring-2 focus:ring-senai-primary/20 transition font-semibold">
+        </div>
+
+        <div class="text-left">
+          <label class="block text-[11px] font-mono font-semibold text-slate-500 mb-1">Escolha a Dificuldade:</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="selectModalDiff('easy')" id="modalDiffEasy" class="py-2 rounded-xl text-xs font-bold border border-senai-primary bg-senai-primary text-white shadow-sm">
+              Fácil (4)
+            </button>
+            <button type="button" onclick="selectModalDiff('medium')" id="modalDiffMedium" class="py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100">
+              Médio (6)
+            </button>
+            <button type="button" onclick="selectModalDiff('hard')" id="modalDiffHard" class="py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100">
+              Difícil (8)
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full bg-senai-primary hover:bg-senai-secondary text-white font-bold py-3 rounded-xl transition shadow-lg shadow-senai-primary/25 flex items-center justify-center gap-2 text-sm mt-2">
+          <i data-lucide="play" class="w-4 h-4"></i>
+          <span>Começar Desafio</span>
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <div id="modalRanking" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
+      
+      <button onclick="closeRankingModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-2 text-amber-600 font-bold text-base mb-1">
+        <i data-lucide="trophy" class="w-5 h-5 text-amber-500"></i>
+        <span>Placar de Melhores Pontuações</span>
+      </div>
+      <p class="text-xs text-slate-500 mb-4">Classificação baseada em velocidade e menor quantidade de jogadas.</p>
+
+      <!-- Filtros de Dificuldade do Ranking -->
+      <div class="flex items-center justify-between bg-slate-50 p-1 rounded-xl border border-slate-200 mb-3 text-xs">
+        <div class="flex gap-1">
+          <button onclick="renderRankingTable('all')" id="rankFilterAll" class="px-3 py-1 rounded-lg font-bold bg-white text-slate-800 shadow-sm border border-slate-200">Todos</button>
+          <button onclick="renderRankingTable('easy')" id="rankFilterEasy" class="px-3 py-1 rounded-lg text-slate-500 hover:text-slate-800">Fácil</button>
+          <button onclick="renderRankingTable('medium')" id="rankFilterMedium" class="px-3 py-1 rounded-lg text-slate-500 hover:text-slate-800">Médio</button>
+          <button onclick="renderRankingTable('hard')" id="rankFilterHard" class="px-3 py-1 rounded-lg text-slate-500 hover:text-slate-800">Difícil</button>
+        </div>
+        <button onclick="clearRankingData()" class="text-[11px] text-slate-400 hover:text-senai-red px-2 py-1 transition flex items-center gap-1 font-semibold">
+          <i data-lucide="trash-2" class="w-3 h-3"></i>
+          <span>Limpar</span>
+        </button>
+      </div>
+
+      <!-- Tabela de Classificação -->
+      <div class="flex-grow overflow-y-auto rounded-xl border border-slate-200 bg-white">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 font-mono text-[10px] uppercase sticky top-0 border-b border-slate-200">
+            <tr>
+              <th class="p-3 text-center w-10">#</th>
+              <th class="p-3">Jogador</th>
+              <th class="p-3 text-center">Modo</th>
+              <th class="p-3 text-center">Tempo</th>
+              <th class="p-3 text-center">Jogadas</th>
+              <th class="p-3 text-right">Score</th>
+            </tr>
+          </thead>
+          <tbody id="rankingTableBody" class="divide-y divide-slate-100 font-mono text-slate-700">
+            <!-- Gerado via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <button onclick="closeRankingModal()" class="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition">
+        Fechar Placar
+      </button>
+
+    </div>
+  </div>
+
+  <div id="modalVictory" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 text-center shadow-2xl relative">
+      
+      <div class="w-16 h-16 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-center mx-auto mb-2 text-emerald-600 shadow-inner">
+        <i data-lucide="party-popper" class="w-9 h-9"></i>
+      </div>
+
+      <span class="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-widest">Desafio Concluído!</span>
+      <h3 class="text-xl font-extrabold text-slate-800 mt-0.5">Parabéns, <span id="victoryPlayerName" class="text-senai-primary">Jogador</span>!</h3>
+      <p class="text-xs text-slate-500 my-1">Sua pontuação foi gravada com sucesso no Ranking!</p>
+
+      <!-- Placar Final -->
+      <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200 my-4 text-xs font-mono">
+        <div>
+          <span class="text-[9px] text-slate-400 uppercase font-semibold block">Tempo</span>
+          <strong id="finalTime" class="text-emerald-600 text-base">00:00</strong>
+        </div>
+        <div>
+          <span class="text-[9px] text-slate-400 uppercase font-semibold block">Jogadas</span>
+          <strong id="finalMoves" class="text-senai-primary text-base">0</strong>
+        </div>
+        <div>
+          <span class="text-[9px] text-slate-400 uppercase font-semibold block">Pontos</span>
+          <strong id="finalScore" class="text-amber-600 text-base">0</strong>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <button onclick="closeVictoryModal(); startNewGame()" class="w-full bg-senai-primary hover:bg-senai-secondary text-white font-bold py-2.5 rounded-xl transition shadow-lg shadow-senai-primary/25 flex items-center justify-center gap-2 text-xs">
+          <i data-lucide="play" class="w-4 h-4"></i>
+          <span>Jogar Novamente</span>
+        </button>
+        <button onclick="closeVictoryModal(); openRankingModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl transition text-xs flex items-center justify-center gap-2">
+          <i data-lucide="trophy" class="w-4 h-4 text-amber-500"></i>
+          <span>Ver Tabela do Ranking</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="modalApresentador" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative">
+      <button onclick="toggleModalApresentador()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-2 text-senai-primary font-bold text-sm mb-3">
+        <i data-lucide="mic" class="w-5 h-5"></i>
+        <span>Roteiro de 1 Minuto para Apresentação no Estande</span>
+      </div>
+
+      <div class="space-y-2.5 text-xs text-slate-600 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 leading-relaxed font-sans">
+        <p>👋 <strong>1. Recepção:</strong> "Olá! Bem-vindo ao estande do curso Técnico em Informática para Internet do SENAI!"</p>
+        <p>🍎 <strong>2. Proposta:</strong> "Desenvolvemos este jogo da memória interativo unindo Frutas e conceitos técnicos. Cada fruta representa uma habilidade do curso, como Front-end, Backend e Banco de Dados!"</p>
+        <p>⚡ <strong>3. Lógica do Projeto:</strong> "Tudo foi construído com JavaScript puro, HTML5 e CSS responsivo. O algoritmo utiliza o embaralhamento Fisher-Yates e a Web Storage API para salvar o ranking do público em tempo real."</p>
+        <p>🎯 <strong>4. Convite:</strong> "Desafio você a fazer o menor tempo e entrar no nosso Top 3 do estande!"</p>
+      </div>
+
+      <button onclick="toggleModalApresentador()" class="mt-4 w-full bg-senai-primary hover:bg-senai-secondary text-white font-bold py-2.5 rounded-xl text-xs transition">
+        Entendido! Voltar ao Jogo
+      </button>
+    </div>
+  </div>
+
+  <div id="codeDrawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+    <div class="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+      <div class="flex items-center gap-2 text-senai-accent font-bold text-xs">
+        <i data-lucide="code-2" class="w-4 h-4"></i>
+        <span>Lógica de Algoritmos & JavaScript</span>
+      </div>
+      <button onclick="toggleCodeDrawer()" class="text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <div class="flex-grow p-4 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-3 bg-slate-950">
+      <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-slate-400 leading-normal">
+        💡 Lógica de embaralhamento sem vício (Fisher-Yates) e cálculo de score aprendidas durante o curso do SENAI.
+      </div>
+
+      <pre class="text-emerald-400 overflow-x-auto p-3 bg-slate-900/80 rounded-xl border border-slate-800"><code>// Algoritmo de Embaralhamento Fisher-Yates
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// Cálculo de Pontuação no Ranking
+function calculateScore(seconds, moves, pairs) {
+  const base = pairs * 600;
+  const timePenalty = seconds * 8;
+  const movePenalty = moves * 15;
+  return Math.max(100, base - timePenalty - movePenalty);
+}</code></pre>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // BANCO DE FRUTAS E ANALOGIAS COM TECNOLOGIA
+    const FRUIT_CARDS = [
+      {
+        id: 'apple',
+        emoji: '🍎',
+        name: 'Maçã',
+        role: 'Estrutura & HTML',
+        concept: 'Clara, organizada e essencial para a fundação de todo site moderno.'
+      },
+      {
+        id: 'banana',
+        emoji: '🍌',
+        name: 'Banana',
+        role: 'CSS & Estilização',
+        concept: 'Flexível e versátil como o CSS Flexbox no design de telas.'
+      },
+      {
+        id: 'orange',
+        emoji: '🍊',
+        name: 'Laranja',
+        role: 'JavaScript & Lógica',
+        concept: 'Cheia de energia para dar dinamismo e interatividade ao sistema.'
+      },
+      {
+        id: 'watermelon',
+        emoji: '🍉',
+        name: 'Melancia',
+        role: 'Banco de Dados',
+        concept: 'Grande capacidade para armazenar e organizar volumes de informações.'
+      },
+      {
+        id: 'strawberry',
+        emoji: '🍓',
+        name: 'Morango',
+        role: 'Front-end & UI',
+        concept: 'Aparência atraente, elegante e focada na experiência do usuário.'
+      },
+      {
+        id: 'pineapple',
+        emoji: '🍍',
+        name: 'Abacaxi',
+        role: 'Cibersegurança',
+        concept: 'Casca protetora forte contra invasões, garantindo a integridade dos dados.'
+      },
+      {
+        id: 'grape',
+        emoji: '🍇',
+        name: 'Uva',
+        role: 'APIs & Conexões',
+        concept: 'Conjunto conectado funcionando em harmonia para integrar serviços.'
+      },
+      {
+        id: 'avocado',
+        emoji: '🥑',
+        name: 'Abacate',
+        role: 'Backend & Servidores',
+        concept: 'Núcleo denso e consistente que sustenta toda a aplicação nos bastidores.'
+      }
+    ];
+
+    // ESTADO DO JOGO
+    let playerName = 'Convidado';
+    let difficulty = 'easy';
+    let selectedModalDiff = 'easy';
+    let cardsDeck = [];
+    let flippedCards = [];
+    let matchedPairsCount = 0;
+    let totalPairsNeeded = 4;
+    let moves = 0;
+    let timerSeconds = 0;
+    let timerInterval = null;
+    let isPreviewing = false;
+    let isLockBoard = true;
+    let audioEnabled = true;
+
+    // WEB AUDIO API (Sintetizador NATIVO sem arquivos externos)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playTone(type) {
+      if (!audioEnabled || !audioCtx) return;
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'flip') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(350, now);
+          osc.frequency.exponentialRampToValueAtTime(550, now + 0.08);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'beep') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(480, now);
+          gain.gain.setValueAtTime(0.06, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'match') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.setValueAtTime(659.25, now + 0.09);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        } else if (type === 'unmatch') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(240, now);
+          osc.frequency.setValueAtTime(200, now + 0.09);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.18);
+          osc.start(now);
+          osc.stop(now + 0.18);
+        } else if (type === 'win') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.setValueAtTime(659.25, now + 0.1);
+          osc.frequency.setValueAtTime(783.99, now + 0.2);
+          osc.frequency.setValueAtTime(1046.50, now + 0.32);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+          osc.start(now);
+          osc.stop(now + 0.45);
+        }
+      } catch (e) {}
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      document.getElementById('soundIcon').setAttribute('data-lucide', audioEnabled ? 'volume-2' : 'volume-x');
+      lucide.createIcons();
+    }
+
+    // MODAL E DIFICULDADES
+    function openPlayerModal() {
+      document.getElementById('modalPlayer').classList.remove('hidden');
+    }
+
+    function selectModalDiff(diff) {
+      selectedModalDiff = diff;
+      document.getElementById('modalDiffEasy').className = diff === 'easy' ? 'py-2 rounded-xl text-xs font-bold border border-senai-primary bg-senai-primary text-white shadow-sm' : 'py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100';
+      document.getElementById('modalDiffMedium').className = diff === 'medium' ? 'py-2 rounded-xl text-xs font-bold border border-senai-primary bg-senai-primary text-white shadow-sm' : 'py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100';
+      document.getElementById('modalDiffHard').className = diff === 'hard' ? 'py-2 rounded-xl text-xs font-bold border border-senai-primary bg-senai-primary text-white shadow-sm' : 'py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100';
+    }
+
+    function handleStartGameFromModal(e) {
+      e.preventDefault();
+      const input = document.getElementById('inputPlayerName');
+      if (input.value.trim()) {
+        playerName = input.value.trim();
+        document.getElementById('headerPlayerName').innerText = playerName;
+        document.getElementById('modalPlayer').classList.add('hidden');
+        setDifficulty(selectedModalDiff);
+      }
+    }
+
+    function setDifficulty(diff) {
+      difficulty = diff;
+      document.getElementById('btnDiffEasy').className = diff === 'easy' ? 'px-3 py-1 rounded-lg text-[11px] font-bold transition bg-senai-primary text-white shadow-sm' : 'px-3 py-1 rounded-lg text-[11px] font-bold transition text-slate-500 hover:text-slate-800';
+      document.getElementById('btnDiffMedium').className = diff === 'medium' ? 'px-3 py-1 rounded-lg text-[11px] font-bold transition bg-senai-primary text-white shadow-sm' : 'px-3 py-1 rounded-lg text-[11px] font-bold transition text-slate-500 hover:text-slate-800';
+      document.getElementById('btnDiffHard').className = diff === 'hard' ? 'px-3 py-1 rounded-lg text-[11px] font-bold transition bg-senai-primary text-white shadow-sm' : 'px-3 py-1 rounded-lg text-[11px] font-bold transition text-slate-500 hover:text-slate-800';
+
+      startNewGame();
+    }
+
+    // EMBARALHAMENTO FISHER-YATES
+    function shuffle(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // INICIAR NOVO JOGO
+    function startNewGame() {
+      clearInterval(timerInterval);
+      timerSeconds = 0;
+      moves = 0;
+      matchedPairsCount = 0;
+      flippedCards = [];
+      isLockBoard = true;
+
+      document.getElementById('movesCount').innerText = '0';
+      document.getElementById('timerDisplay').innerText = '00:00';
+      document.getElementById('matchFeedbackBanner').classList.add('hidden');
+
+      totalPairsNeeded = difficulty === 'easy' ? 4 : (difficulty === 'medium' ? 6 : 8);
+      document.getElementById('pairsDisplay').innerText = `0/${totalPairsNeeded}`;
+
+      const selectedFruits = FRUIT_CARDS.slice(0, totalPairsNeeded);
+      const rawDeck = [];
+      selectedFruits.forEach((item) => {
+        rawDeck.push({ ...item, uid: `${item.id}-1`, pairId: item.id });
+        rawDeck.push({ ...item, uid: `${item.id}-2`, pairId: item.id });
+      });
+
+      cardsDeck = shuffle(rawDeck);
+      renderGrid();
+
+      const previewTime = difficulty === 'easy' ? 3 : (difficulty === 'medium' ? 4 : 5);
+      runPreviewPhase(previewTime);
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('cardsGrid');
+      grid.innerHTML = '';
+
+      if (totalPairsNeeded === 4) {
+        // Fácil (8 cartas): 4x2
+        grid.className = 'w-full h-full grid grid-cols-4 grid-rows-2 gap-3 max-w-2xl max-h-[420px] mx-auto';
+      } else if (totalPairsNeeded === 6) {
+        // Médio (12 cartas): 4x3
+        grid.className = 'w-full h-full grid grid-cols-4 grid-rows-3 gap-2.5 max-w-3xl max-h-[480px] mx-auto';
+      } else {
+        // Difícil (16 cartas): 4x4 - Adaptado para caber perfeitamente na tela sem scroll
+        grid.className = 'w-full h-full grid grid-cols-4 grid-rows-4 gap-2 max-w-3xl max-h-[500px] mx-auto';
+      }
+
+      cardsDeck.forEach((cardData, index) => {
+        const cardContainer = document.createElement('div');
+        cardContainer.className = 'perspective-1000 w-full h-full cursor-pointer select-none min-h-0';
+        cardContainer.onclick = () => onCardClick(index);
+
+        // IMAGENS GRANDES E LEGÍVEIS PARA O ESTANDE
+        const cardTitleSize = totalPairsNeeded === 8 ? 'text-xs' : 'text-sm';
+        const emojiSize = totalPairsNeeded === 8 ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl';
+
+        cardContainer.innerHTML = `
+          <div id="card-inner-${index}" class="card-inner relative w-full h-full transform-style-3d rotate-y-180">
+            <!-- FRENTE DA CARTA (IMAGEM GRANDE DA FRUTA) -->
+            <div class="absolute inset-0 w-full h-full rounded-2xl bg-white border-2 border-slate-200/90 p-2 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition backface-hidden">
+              <div class="my-auto flex items-center justify-center">
+                <span class="${emojiSize} transition-transform hover:scale-110 drop-shadow-sm">${cardData.emoji}</span>
+              </div>
+              <div class="text-center w-full shrink-0">
+                <strong class="${cardTitleSize} font-bold text-slate-800 block leading-tight truncate">${cardData.name}</strong>
+                <span class="text-[9px] font-mono text-senai-primary font-semibold block truncate leading-tight">${cardData.role}</span>
+              </div>
+            </div>
+
+            <!-- VERSO DA CARTA (CLEAN & ELEGANTE SENAI) -->
+            <div class="absolute inset-0 w-full h-full rounded-2xl bg-slate-100 border-2 border-slate-200 p-1 flex flex-col items-center justify-center shadow-xs rotate-y-180 backface-hidden hover:border-senai-primary/50 transition">
+              <div class="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-senai-primary font-black text-xs font-mono shadow-xs">
+                S
+              </div>
+            </div>
+          </div>
+        `;
+        grid.appendChild(cardContainer);
+      });
+    }
+
+    // FASE DE MEMORIZAÇÃO
+    function runPreviewPhase(seconds) {
+      isPreviewing = true;
+      isLockBoard = true;
+
+      const banner = document.getElementById('previewBanner');
+      const progressBar = document.getElementById('previewProgressBar');
+      const countdownText = document.getElementById('previewCountdown');
+
+      banner.classList.remove('hidden');
+      progressBar.style.width = '100%';
+      countdownText.innerText = `${seconds}s`;
+
+      for (let i = 0; i < cardsDeck.length; i++) {
+        const inner = document.getElementById(`card-inner-${i}`);
+        if (inner) inner.classList.remove('rotate-y-180');
+      }
+
+      let timeLeft = seconds;
+      const interval = setInterval(() => {
+        timeLeft--;
+        playTone('beep');
+        countdownText.innerText = `${timeLeft}s`;
+        progressBar.style.width = `${(timeLeft / seconds) * 100}%`;
+
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          for (let i = 0; i < cardsDeck.length; i++) {
+            const inner = document.getElementById(`card-inner-${i}`);
+            if (inner) inner.classList.add('rotate-y-180');
+          }
+
+          banner.classList.add('hidden');
+          isPreviewing = false;
+          isLockBoard = false;
+          startTimer();
+        }
+      }, 1000);
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timerSeconds++;
+        const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+        const secs = String(timerSeconds % 60).padStart(2, '0');
+        document.getElementById('timerDisplay').innerText = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function onCardClick(index) {
+      if (isLockBoard || isPreviewing) return;
+      const inner = document.getElementById(`card-inner-${index}`);
+
+      if (!inner.classList.contains('rotate-y-180') || flippedCards.includes(index)) return;
+
+      inner.classList.remove('rotate-y-180');
+      playTone('flip');
+      flippedCards.push(index);
+
+      if (flippedCards.length === 2) {
+        moves++;
+        document.getElementById('movesCount').innerText = moves;
+        checkMatch();
+      }
+    }
+
+    function checkMatch() {
+      isLockBoard = true;
+      const [idx1, idx2] = flippedCards;
+      const card1 = cardsDeck[idx1];
+      const card2 = cardsDeck[idx2];
+
+      if (card1.pairId === card2.pairId) {
+        playTone('match');
+        matchedPairsCount++;
+        document.getElementById('pairsDisplay').innerText = `${matchedPairsCount}/${totalPairsNeeded}`;
+
+        document.getElementById(`card-inner-${idx1}`).classList.add('card-matched');
+        document.getElementById(`card-inner-${idx2}`).classList.add('card-matched');
+
+        showMatchFeedback(card1);
+
+        flippedCards = [];
+        isLockBoard = false;
+
+        if (matchedPairsCount === totalPairsNeeded) {
+          setTimeout(handleWin, 400);
+        }
+      } else {
+        playTone('unmatch');
+        setTimeout(() => {
+          document.getElementById(`card-inner-${idx1}`).classList.add('rotate-y-180');
+          document.getElementById(`card-inner-${idx2}`).classList.add('rotate-y-180');
+          flippedCards = [];
+          isLockBoard = false;
+        }, 850);
+      }
+    }
+
+    function showMatchFeedback(card) {
+      const banner = document.getElementById('matchFeedbackBanner');
+      document.getElementById('matchFeedbackEmoji').innerText = card.emoji;
+      document.getElementById('matchFeedbackTitle').innerText = `${card.name} — ${card.role}`;
+      document.getElementById('matchFeedbackConcept').innerText = card.concept;
+      banner.classList.remove('hidden');
+    }
+
+    function calculateScore(seconds, moves, pairs) {
+      const base = pairs * 600;
+      const timePenalty = seconds * 8;
+      const movePenalty = moves * 15;
+      return Math.max(100, base - timePenalty - movePenalty);
+    }
+
+    function savePlayerScore(time, moves, pairs, diff) {
+      const score = calculateScore(time, moves, pairs);
+      const newEntry = {
+        name: playerName,
+        diff: diff,
+        time: time,
+        moves: moves,
+        score: score,
+        date: new Date().toLocaleDateString('pt-BR')
+      };
+
+      const existingRank = JSON.parse(localStorage.getItem('senai_fruits_ranking') || '[]');
+      existingRank.push(newEntry);
+      existingRank.sort((a, b) => b.score - a.score);
+
+      localStorage.setItem('senai_fruits_ranking', JSON.stringify(existingRank));
+      return score;
+    }
+
+    function renderRankingTable(filter = 'all') {
+      const tbody = document.getElementById('rankingTableBody');
+      const rankData = JSON.parse(localStorage.getItem('senai_fruits_ranking') || '[]');
+
+      ['All', 'Easy', 'Medium', 'Hard'].forEach(f => {
+        const btn = document.getElementById(`rankFilter${f}`);
+        if (btn) {
+          btn.className = f.toLowerCase() === filter 
+            ? 'px-3 py-1 rounded-lg font-bold bg-white text-slate-800 shadow-sm border border-slate-200' 
+            : 'px-3 py-1 rounded-lg text-slate-500 hover:text-slate-800';
+        }
+      });
+
+      const filtered = filter === 'all' ? rankData : rankData.filter(item => item.diff === filter);
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400 italic font-sans">Nenhuma pontuação registrada ainda.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((item, index) => {
+        const mins = String(Math.floor(item.time / 60)).padStart(2, '0');
+        const secs = String(item.time % 60).padStart(2, '0');
+        const diffLabel = item.diff === 'easy' ? 'Fácil' : (item.diff === 'medium' ? 'Médio' : 'Difícil');
+        const medal = index === 0 ? '🥇' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : `${index + 1}`));
+
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-2.5 text-center font-bold text-amber-500">${medal}</td>
+            <td class="p-2.5 font-bold text-slate-800 truncate max-w-[120px]">${item.name}</td>
+            <td class="p-2.5 text-center text-slate-500 text-[10px]">${diffLabel}</td>
+            <td class="p-2.5 text-center text-emerald-600 font-semibold">${mins}:${secs}</td>
+            <td class="p-2.5 text-center text-senai-primary">${item.moves}</td>
+            <td class="p-2.5 text-right font-extrabold text-amber-600">${item.score}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function clearRankingData() {
+      if (confirm('Deseja limpar todo o histórico do ranking do estande?')) {
+        localStorage.removeItem('senai_fruits_ranking');
+        renderRankingTable('all');
+      }
+    }
+
+    function openRankingModal() {
+      renderRankingTable('all');
+      document.getElementById('modalRanking').classList.remove('hidden');
+    }
+
+    function closeRankingModal() {
+      document.getElementById('modalRanking').classList.add('hidden');
+    }
+
+    // TRATAR VITÓRIA
+    function handleWin() {
+      clearInterval(timerInterval);
+      playTone('win');
+
+      if (typeof confetti === 'function') {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      }
+
+      const score = savePlayerScore(timerSeconds, moves, totalPairsNeeded, difficulty);
+
+      const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+      const secs = String(timerSeconds % 60).padStart(2, '0');
+      document.getElementById('victoryPlayerName').innerText = playerName;
+      document.getElementById('finalTime').innerText = `${mins}:${secs}`;
+      document.getElementById('finalMoves').innerText = moves;
+      document.getElementById('finalScore').innerText = score;
+
+      document.getElementById('modalVictory').classList.remove('hidden');
+    }
+
+    function closeVictoryModal() {
+      document.getElementById('modalVictory').classList.add('hidden');
+    }
+
+    function toggleModalApresentador() {
+      document.getElementById('modalApresentador').classList.toggle('hidden');
+    }
+
+    function toggleCodeDrawer() {
+      document.getElementById('codeDrawer').classList.toggle('translate-x-full');
+    }
+
+    window.onload = () => {
+      openPlayerModal();
+    };
+  </script>
+</body>
+</html>
